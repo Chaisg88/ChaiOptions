@@ -16,6 +16,25 @@ try {
 }
 const root = path.resolve(fileURLToPath(new URL("./public/", import.meta.url)));
 const dataDir = path.resolve(process.env.DATA_DIR || "./data");
+const appName = process.env.APP_NAME || "Chai";
+const wordmark =
+  process.env.APP_WORDMARK ||
+  (appName === "Chai"
+    ? "chai"
+    : appName.replace(/Options$/i, "").toLowerCase());
+const appSlug = process.env.APP_SLUG || "chai-options";
+if (
+  !/^[A-Za-z0-9 ]{1,40}$/.test(appName) ||
+  !/^[a-z0-9]{1,20}$/.test(wordmark) ||
+  !/^[a-z0-9-]{1,40}$/.test(appSlug)
+)
+  throw new Error("Invalid app branding configuration");
+const templates = {
+  APP_NAME: appName,
+  APP_WORDMARK: wordmark,
+  APP_INITIAL: wordmark[0],
+  APP_SLUG: appSlug,
+};
 if (process.env.REQUIRE_DATABASE === "true" && !process.env.DATABASE_URL)
   throw new Error(
     "Add DATABASE_URL in Render Environment settings to connect permanent storage.",
@@ -23,6 +42,7 @@ if (process.env.REQUIRE_DATABASE === "true" && !process.env.DATABASE_URL)
 const db = await openStorage({
   databaseUrl: process.env.DATABASE_URL,
   dataDir,
+  schema: process.env.DB_SCHEMA || "public",
 });
 const hash = (value) => {
   const salt = randomBytes(16).toString("hex");
@@ -269,7 +289,14 @@ const server = http
       if (!file.startsWith(root + path.sep))
         return send(403, { error: "Forbidden." });
       try {
-        const data = await readFile(file);
+        let data = await readFile(file);
+        if ([".html", ".svg"].includes(path.extname(file)))
+          data = data
+            .toString()
+            .replace(
+              /\{\{(APP_NAME|APP_WORDMARK|APP_INITIAL|APP_SLUG)\}\}/g,
+              (_, key) => templates[key],
+            );
         res.writeHead(200, {
           "Content-Type":
             (types[path.extname(file)] || "application/octet-stream") +
@@ -287,7 +314,7 @@ const server = http
     }
   })
   .listen(Number(process.env.PORT || 3000), "0.0.0.0", () =>
-    console.log("Chai Options running on port " + (process.env.PORT || 3000)),
+    console.log(appName + " running on port " + (process.env.PORT || 3000)),
   );
 
 for (const signal of ["SIGTERM", "SIGINT"])

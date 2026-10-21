@@ -54,6 +54,7 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForURL("**/login");
+  assert.ok((await page.title()).includes(process.env.APP_NAME || "Chai"));
   await page.locator("[name=email]").fill("test@example.com");
   await page.locator("[name=password]").fill(password);
   await page.getByRole("button", { name: "Sign in →" }).click();

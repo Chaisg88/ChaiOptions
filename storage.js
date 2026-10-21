@@ -1,7 +1,17 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-export async function openStorage({ databaseUrl, dataDir }) {
+export async function openStorage({ databaseUrl, dataDir, schema = "public" }) {
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(schema))
+    throw new Error("Invalid database schema name");
+  const qualify = (text) =>
+    text.replace(
+      /\b(FROM|JOIN|INTO|UPDATE|REFERENCES|TABLE IF NOT EXISTS)\s+(users|sessions|trades)\b/gi,
+      (_, operation, table) =>
+        `${operation} "${schema}".${table.toLowerCase()}`,
+    );
+  const query = (connection, text, ...args) =>
+    connection.query(qualify(text), ...args);
   let sqlite, pool;
   const sql = (text) => {
     let i = 0;
@@ -19,15 +29,25 @@ export async function openStorage({ databaseUrl, dataDir }) {
         "Database connection lost; the next request will reconnect.",
       ),
     );
-    await pool.query(`CREATE TABLE IF NOT EXISTS users (
+    if (schema !== "public")
+      await query(pool, `CREATE SCHEMA IF NOT EXISTS "${schema}"`);
+    await query(
+      pool,
+      `CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
       must_change INTEGER NOT NULL DEFAULT 1, revision INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), expires BIGINT NOT NULL);
-      CREATE TABLE IF NOT EXISTS trades (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), data TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS trades (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), data TEXT NOT NULL);`,
+    );
   } else {
     const { DatabaseSync } = await import("node:sqlite");
     await mkdir(dataDir, { recursive: true, mode: 0o700 });
-    sqlite = new DatabaseSync(path.join(dataDir, "chai.sqlite"));
+    sqlite = new DatabaseSync(
+      path.join(
+        dataDir,
+        schema === "public" ? "chai.sqlite" : `${schema}.sqlite`,
+      ),
+    );
     sqlite.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,must_change INTEGER NOT NULL DEFAULT 1,revision INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),expires INTEGER NOT NULL);
@@ -46,21 +66,22 @@ export async function openStorage({ databaseUrl, dataDir }) {
     kind: pool ? "postgres" : "sqlite",
     async get(text, ...params) {
       return pool
-        ? (await pool.query(sql(text), params)).rows[0]
+        ? (await query(pool, sql(text), params)).rows[0]
         : sqlite.prepare(text).get(...params);
     },
     async run(text, ...params) {
       return pool
-        ? pool.query(sql(text), params)
+        ? query(pool, sql(text), params)
         : sqlite.prepare(text).run(...params);
     },
     async ping() {
-      return pool ? pool.query("SELECT 1") : sqlite.prepare("SELECT 1").get();
+      return pool ? query(pool, "SELECT 1") : sqlite.prepare("SELECT 1").get();
     },
     async snapshot(userId) {
       if (pool) {
         const row = (
-          await pool.query(
+          await query(
+            pool,
             `SELECT revision, COALESCE((SELECT json_agg(data::json) FROM trades WHERE user_id=users.id),'[]'::json) AS trades FROM users WHERE id=$1`,
             [userId],
           )
@@ -81,27 +102,29 @@ export async function openStorage({ databaseUrl, dataDir }) {
       if (pool) {
         const connection = await pool.connect();
         try {
-          await connection.query("BEGIN");
-          const updated = await connection.query(
+          await query(connection, "BEGIN");
+          const updated = await query(
+            connection,
             "UPDATE users SET revision=revision+1 WHERE id=$1 AND revision=$2 RETURNING revision",
             [userId, revision],
           );
           if (!updated.rowCount) {
-            await connection.query("ROLLBACK");
+            await query(connection, "ROLLBACK");
             return null;
           }
-          await connection.query("DELETE FROM trades WHERE user_id=$1", [
+          await query(connection, "DELETE FROM trades WHERE user_id=$1", [
             userId,
           ]);
           for (const trade of trades)
-            await connection.query(
+            await query(
+              connection,
               "INSERT INTO trades(id,user_id,data) VALUES($1,$2,$3)",
               [trade.id, userId, JSON.stringify(trade)],
             );
-          await connection.query("COMMIT");
+          await query(connection, "COMMIT");
           return updated.rows[0].revision;
         } catch (error) {
-          await connection.query("ROLLBACK");
+          await query(connection, "ROLLBACK");
           throw error;
         } finally {
           connection.release();

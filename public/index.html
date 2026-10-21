@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Chai — Options journal</title>
+    <title>{{APP_NAME}} — Options journal</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body>
+  <body data-app-name="{{APP_NAME}}" data-app-slug="{{APP_SLUG}}">
     <aside class="sidebar">
-      <a class="brand" href="/" aria-label="Chai home"
-        ><span class="brand-icon">c<span>↗</span></span
-        >chai<span class="brand-dot">.</span></a
+      <a class="brand" href="/" aria-label="{{APP_NAME}} home"
+        ><span class="brand-icon">{{APP_INITIAL}}<span>↗</span></span
+        >{{APP_WORDMARK}}<span class="brand-dot">.</span></a
       >
       <div class="workspace">PERSONAL WORKSPACE</div>
       <a class="nav active" href="#"><span>◫</span> Overview</a
@@ -235,8 +235,8 @@
         </section>
         <footer>
           Built for a clearer view of your trades.<span
-            >chai. <span class="footer-dot">●</span> Your personal options
-            journal</span
+            >{{APP_WORDMARK}}. <span class="footer-dot">●</span> Your personal
+            options journal</span
           >
         </footer>
       </main>

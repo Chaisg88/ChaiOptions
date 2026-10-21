@@ -54,3 +54,11 @@ Use HTTPS in production. Use the database provider’s access controls and backu
 The free-service API helper is `scripts/deploy-render.py`. Supply `--owner-id`, `--root-email`, and a private `--credentials-dir` outside this checkout. It uses `RENDER_API_KEY` from the environment, creates only a free web service, and never prints credentials. Use `--dry-run` to inspect the configuration without making API calls. Add the Neon connection string in Render's Environment settings after service creation.
 
 `scripts/browser-smoke.mjs` runs the browser workflow against an isolated local server and temporary credentials. It requires Playwright and Chromium. Set `PLAYWRIGHT_MODULE` to the Playwright module path if it is installed outside this project. Optionally set `TEST_DATABASE_URL` to an isolated PostgreSQL database; the browser check writes test data, so never use the production database.
+
+## Separate private journals
+
+One codebase can host separate Chai and JeanOptions services. Each service must have its own `ROOT_EMAIL`, generated `ROOT_PASSWORD`, `APP_NAME`, `APP_SLUG`, and `DB_SCHEMA` (for example, `jean_options`). Each PostgreSQL query explicitly names its schema, without a public-schema fallback or reliance on pooled session settings. Account, session and trade tables are separate; the Chai login cannot access JeanOptions. Local SQLite instances also use separate files when schema names differ.
+
+This provides separation between app accounts, not privacy from the hosting/database administrator. Anyone controlling Render or Neon can still access the underlying records or reset accounts. Full independence requires Jean-controlled hosting and database accounts. There is no shared admin dashboard in the app.
+
+The deployment helper accepts `--service-name jean-options --app-name JeanOptions --db-schema jean_options` and can copy the existing database connection directly between Render services using `--copy-database-from-service <id>`. Connection values are never printed or written to source. Store each app's generated credentials in a different private directory outside the checkout.

@@ -423,7 +423,7 @@ function exportData() {
     url = URL.createObjectURL(blob),
     a = document.createElement("a");
   a.href = url;
-  a.download = `chai-options-${today()}.json`;
+  a.download = `${document.body.dataset.appSlug}-${today()}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast("Backup exported. Keep it in a safe place.");
@@ -439,7 +439,7 @@ $("#import-file").addEventListener("change", async (e) => {
       throw new Error("Backup is too large (maximum 1.5 MB).");
     const data = JSON.parse(await file.text());
     if (data.version !== 1 || !Array.isArray(data.trades))
-      throw new Error("Choose a Chai Options JSON backup.");
+      throw new Error(`Choose a ${document.body.dataset.appName} JSON backup.`);
     if (
       !confirm(
         `Import ${data.trades.length} trades? This replaces all ${trades.length} existing trades. Export a backup first if needed.`,
