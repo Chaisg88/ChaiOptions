@@ -1,16 +1,414 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>Chai — Options journal</title><link rel="stylesheet" href="/style.css"></head>
-<body>
-<aside class="sidebar"><a class="brand" href="/" aria-label="Chai home"><span class="brand-icon">c<span>↗</span></span>chai<span class="brand-dot">.</span></a><div class="workspace">PERSONAL WORKSPACE</div><a class="nav active" href="#"><span>◫</span> Overview</a><a class="nav" href="#positions"><span>▤</span> My positions</a><a class="nav" href="#activity"><span>↗</span> Cash activity</a><div class="sidebar-bottom"><div class="local-icon">▣</div><strong>Your journal, your account</strong><p>Records are saved to your account.<br>Export a backup to keep them safe.</p><button id="export-side" class="text-button">Export your data ↗</button><div class="profile"><span>CO</span><div>My portfolio<small>Personal account</small></div><span class="online">●</span></div></div></aside>
-<div class="main"><header><div class="breadcrumb">Workspace <span>/</span> <strong>Overview</strong></div><div class="header-right"><span class="save-state" id="save-state">● Saved to your account</span><button class="logout" id="change-password">Password</button><button class="logout" id="logout">Sign out</button><button class="icon-button" id="help" aria-label="How calculations work">?</button></div></header>
-<main><div class="page-heading"><div><div class="eyebrow">YOUR OPTIONS, AT A GLANCE</div><h1>A little more clarity.<br><span>A better trading day.</span></h1><p>Track your premiums. Understand your performance.</p></div><button class="button primary" id="add-trade">＋ <span>Log a trade</span></button></div>
-<section class="toolbar"><div class="tabs" id="period-tabs"><button class="selected" data-period="month">This month</button><button data-period="today">Today</button><button data-period="all">All time</button><button data-period="custom">Custom</button></div><div class="date-filter"><input type="date" id="from" aria-label="Start date"><span>→</span><input type="date" id="to" aria-label="End date"></div></section>
-<section class="stats"><article class="stat hero-stat"><div class="stat-label">Net realized P&L <span>↗</span></div><div class="stat-value" id="net">$0.00</div><div class="stat-foot" id="net-foot">From closed positions in this period</div><div class="hero-lines"></div></article><article class="stat"><div class="stat-label">Premium collected <span class="stat-icon">↓</span></div><div class="stat-value" id="collected">$0.00</div><div class="stat-foot">Gross premiums from selling options</div></article><article class="stat"><div class="stat-label">Cash paid <span class="stat-icon">↑</span></div><div class="stat-value" id="paid">$0.00</div><div class="stat-foot">Buy premiums, closing costs & fees</div></article><article class="stat"><div class="stat-label">Open positions <span class="stat-icon">◫</span></div><div class="stat-value" id="open">0</div><div class="stat-foot" id="open-foot">Across your portfolio</div></article></section>
-<section class="performance-grid"><article class="panel chart-panel"><div class="panel-heading"><div><h2>Premium cash flow</h2><p>Your net cash movement, day by day</p></div><div class="legend"><span></span> Cumulative net cash</div></div><div id="chart" class="chart"></div><div class="chart-footer"><span>Premium received is cash flow, not profit until closed.</span><span>USD</span></div></article><article class="panel breakdown"><div class="panel-heading"><div><h2>By strategy</h2><p>Realized results this period</p></div><span class="subtle">↗</span></div><div id="strategies"></div><div class="win-rate"><span>Win rate <small>Closed trades</small></span><strong id="win-rate">—</strong></div></article></section>
-<section class="panel positions-panel" id="positions"><div class="panel-heading"><div><h2>Your positions <span class="count" id="position-count">0</span></h2><p>A complete picture of every trade.</p></div><div class="table-actions"><button class="button secondary" id="export">↓ Export</button><button class="button secondary" id="import">↑ Import</button><input type="file" id="import-file" accept="application/json" hidden></div></div><div class="position-filters"><div class="tabs small" id="status-tabs"><button class="selected" data-status="all">All positions</button><button data-status="open">Open</button><button data-status="closed">Closed</button></div><div class="search-filters"><input id="search" placeholder="Search symbol…" aria-label="Search symbol"><select id="strategy-filter" aria-label="Filter strategy"><option value="all">All strategies</option><option value="sell_put">Sell put</option><option value="sell_call">Sell call</option><option value="buy_put">Buy put</option></select></div></div><div class="table-wrap"><table><thead><tr><th>SYMBOL / STRATEGY</th><th>STRIKE / EXPIRY</th><th>CONTRACTS</th><th>OPENING PREMIUM</th><th>STATUS</th><th>REALIZED P&L</th><th></th></tr></thead><tbody id="trade-rows"></tbody></table></div><div class="empty" id="empty"><div class="empty-art">↗</div><h3>Your next chapter starts with a trade.</h3><p>Log your first option to start tracking premiums and performance.</p><button class="button secondary" id="empty-add">＋ Log your first trade</button></div><div class="table-footer"><span id="showing">0 positions</span><span>All amounts in USD · Fees included in P&L</span></div></section>
-<section class="panel activity-panel" id="activity"><div class="panel-heading"><div><h2>Daily activity</h2><p>What came in, what went out, and what you earned.</p></div><span class="subtle">Selected period</span></div><div class="table-wrap"><table><thead><tr><th>DATE</th><th>CASH IN</th><th>CASH OUT</th><th>NET CASH FLOW</th><th>REALIZED GAINS</th><th>REALIZED LOSSES</th><th>NET REALIZED P&L</th></tr></thead><tbody id="daily-rows"></tbody></table></div></section><footer>Built for a clearer view of your trades.<span>chai. <span class="footer-dot">●</span> Your personal options journal</span></footer></main></div>
-<dialog id="trade-dialog"><form id="trade-form"><div class="modal-heading"><div><div class="eyebrow">GROW YOUR JOURNAL</div><h2>Log a trade</h2></div><button type="button" class="icon-button dismiss" aria-label="Close">×</button></div><p class="modal-description">Record your opening premium. You can close the position later.</p><div class="form-grid"><label>Symbol<input name="symbol" required maxlength="12" placeholder="e.g. AAPL"></label><label>Strategy<select name="strategy"><option value="sell_put">Sell put</option><option value="sell_call">Sell call</option><option value="buy_put">Buy put</option></select></label><label>Trade date<input name="date" type="date" required></label><label>Expiration date<input name="expiry" type="date" required></label><label>Strike price ($)<input name="strike" type="number" min="0.01" step="0.01" required placeholder="150.00"></label><label>Contracts<input name="quantity" type="number" min="1" max="100000" step="1" value="1" required></label><label>Premium per share ($)<input name="premium" type="number" min="0" step="0.0001" required placeholder="2.50"></label><label>Total opening fees ($)<input name="fees" type="number" min="0" step="0.01" value="0" required></label><label>Contract multiplier<input name="multiplier" type="number" min="1" max="100000" step="1" value="100" required></label><label>Notes (optional)<input name="notes" maxlength="500" placeholder="Your trading thesis…"></label></div><div class="form-preview" id="open-preview">Enter a premium to see your opening cash flow.</div><div class="modal-actions"><button type="button" class="button secondary dismiss">Cancel</button><button class="button primary">Save trade</button></div></form></dialog>
-<dialog id="close-dialog"><form id="close-form"><div class="modal-heading"><div><div class="eyebrow">COMPLETE THE PICTURE</div><h2 id="close-title">Close position</h2></div><button type="button" class="icon-button dismiss" aria-label="Close">×</button></div><p class="modal-description" id="close-description"></p><div class="form-grid"><label>Close date<input name="date" type="date" required></label><label id="closing-label">Closing premium per share ($)<input name="premium" type="number" min="0" step="0.0001" required></label><label>Total closing fees ($)<input name="fees" type="number" min="0" step="0.01" value="0" required></label></div><div class="form-preview" id="close-preview"></div><p class="hint">Closes all contracts. For expiration without value, enter 0. Assignment and stock transactions are not tracked.</p><div class="modal-actions"><button type="button" class="button secondary dismiss">Cancel</button><button class="button primary">Close position</button></div></form></dialog>
-<dialog id="detail-dialog"><div id="detail-content"></div></dialog><dialog id="password-dialog"><form id="password-form"><div class="modal-heading"><h2>Set your password</h2></div><p class="modal-description" id="password-description">Choose a password of at least 12 characters.</p><label>Current password<input name="current" type="password" required autocomplete="current-password"></label><label>New password<input name="password" type="password" minlength="12" maxlength="128" required autocomplete="new-password"></label><label>Confirm new password<input name="confirm" type="password" minlength="12" required autocomplete="new-password"></label><p class="form-error" id="password-error" role="alert"></p><div class="modal-actions"><button type="button" class="button secondary" id="password-cancel">Cancel</button><button class="button primary">Update password</button></div></form></dialog><div class="toast" id="toast" role="status"></div><script type="module" src="/app.js"></script>
-</body></html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Chai — Options journal</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Chai home"
+        ><span class="brand-icon">c<span>↗</span></span
+        >chai<span class="brand-dot">.</span></a
+      >
+      <div class="workspace">PERSONAL WORKSPACE</div>
+      <a class="nav active" href="#"><span>◫</span> Overview</a
+      ><a class="nav" href="#positions"><span>▤</span> My positions</a
+      ><a class="nav" href="#activity"><span>↗</span> Cash activity</a>
+      <div class="sidebar-bottom">
+        <div class="local-icon">▣</div>
+        <strong>Your journal, your account</strong>
+        <p>
+          Records are saved to your account.<br />Export a backup to keep them
+          safe.
+        </p>
+        <button id="export-side" class="text-button">
+          Export your data ↗
+        </button>
+        <div class="profile">
+          <span>CO</span>
+          <div>My portfolio<small>Personal account</small></div>
+          <span class="online">●</span>
+        </div>
+      </div>
+    </aside>
+    <div class="main">
+      <header>
+        <div class="breadcrumb">
+          Workspace <span>/</span> <strong>Overview</strong>
+        </div>
+        <div class="header-right">
+          <span class="save-state" id="save-state">● Saved to your account</span
+          ><button class="logout" id="change-password">Password</button
+          ><button class="logout" id="logout">Sign out</button
+          ><button
+            class="icon-button"
+            id="help"
+            aria-label="How calculations work"
+          >
+            ?
+          </button>
+        </div>
+      </header>
+      <main>
+        <div class="page-heading">
+          <div>
+            <div class="eyebrow">YOUR OPTIONS, AT A GLANCE</div>
+            <h1>
+              A little more clarity.<br /><span>A better trading day.</span>
+            </h1>
+            <p>Track your premiums. Understand your performance.</p>
+          </div>
+          <button class="button primary" id="add-trade">
+            ＋ <span>Log a trade</span>
+          </button>
+        </div>
+        <section class="toolbar">
+          <div class="tabs" id="period-tabs">
+            <button class="selected" data-period="month">This month</button
+            ><button data-period="today">Today</button
+            ><button data-period="all">All time</button
+            ><button data-period="custom">Custom</button>
+          </div>
+          <div class="date-filter">
+            <input type="date" id="from" aria-label="Start date" /><span>→</span
+            ><input type="date" id="to" aria-label="End date" />
+          </div>
+        </section>
+        <section class="stats">
+          <article class="stat hero-stat">
+            <div class="stat-label">Net realized P&L <span>↗</span></div>
+            <div class="stat-value" id="net">$0.00</div>
+            <div class="stat-foot" id="net-foot">
+              From closed positions in this period
+            </div>
+            <div class="hero-lines"></div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">
+              Premium collected <span class="stat-icon">↓</span>
+            </div>
+            <div class="stat-value" id="collected">$0.00</div>
+            <div class="stat-foot">Gross premiums from selling options</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">
+              Cash paid <span class="stat-icon">↑</span>
+            </div>
+            <div class="stat-value" id="paid">$0.00</div>
+            <div class="stat-foot">Buy premiums, closing costs & fees</div>
+          </article>
+          <article class="stat">
+            <div class="stat-label">
+              Open positions <span class="stat-icon">◫</span>
+            </div>
+            <div class="stat-value" id="open">0</div>
+            <div class="stat-foot" id="open-foot">Across your portfolio</div>
+          </article>
+        </section>
+        <section class="performance-grid">
+          <article class="panel chart-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Premium cash flow</h2>
+                <p>Your net cash movement, day by day</p>
+              </div>
+              <div class="legend"><span></span> Cumulative net cash</div>
+            </div>
+            <div id="chart" class="chart"></div>
+            <div class="chart-footer">
+              <span
+                >Premium received is cash flow, not profit until closed.</span
+              ><span>USD</span>
+            </div>
+          </article>
+          <article class="panel breakdown">
+            <div class="panel-heading">
+              <div>
+                <h2>By strategy</h2>
+                <p>Realized results this period</p>
+              </div>
+              <span class="subtle">↗</span>
+            </div>
+            <div id="strategies"></div>
+            <div class="win-rate">
+              <span>Win rate <small>Closed trades</small></span
+              ><strong id="win-rate">—</strong>
+            </div>
+          </article>
+        </section>
+        <section class="panel positions-panel" id="positions">
+          <div class="panel-heading">
+            <div>
+              <h2>
+                Your positions <span class="count" id="position-count">0</span>
+              </h2>
+              <p>A complete picture of every trade.</p>
+            </div>
+            <div class="table-actions">
+              <button class="button secondary" id="export">↓ Export</button
+              ><button class="button secondary" id="import">↑ Import</button
+              ><input
+                type="file"
+                id="import-file"
+                accept="application/json"
+                hidden
+              />
+            </div>
+          </div>
+          <div class="position-filters">
+            <div class="tabs small" id="status-tabs">
+              <button class="selected" data-status="all">All positions</button
+              ><button data-status="open">Open</button
+              ><button data-status="closed">Closed</button>
+            </div>
+            <div class="search-filters">
+              <input
+                id="search"
+                placeholder="Search symbol…"
+                aria-label="Search symbol"
+              /><select id="strategy-filter" aria-label="Filter strategy">
+                <option value="all">All strategies</option>
+                <option value="sell_put">Sell put</option>
+                <option value="sell_call">Sell call</option>
+                <option value="buy_put">Buy put</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>SYMBOL / STRATEGY</th>
+                  <th>STRIKE / EXPIRY</th>
+                  <th>CONTRACTS</th>
+                  <th>OPENING PREMIUM</th>
+                  <th>STATUS</th>
+                  <th>REALIZED P&L</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="trade-rows"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="empty">
+            <div class="empty-art">↗</div>
+            <h3>Your next chapter starts with a trade.</h3>
+            <p>
+              Log your first option to start tracking premiums and performance.
+            </p>
+            <button class="button secondary" id="empty-add">
+              ＋ Log your first trade
+            </button>
+          </div>
+          <div class="table-footer">
+            <span id="showing">0 positions</span
+            ><span>All amounts in USD · Fees included in P&L</span>
+          </div>
+        </section>
+        <section class="panel activity-panel" id="activity">
+          <div class="panel-heading">
+            <div>
+              <h2>Daily activity</h2>
+              <p>What came in, what went out, and what you earned.</p>
+            </div>
+            <span class="subtle">Selected period</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>CASH IN</th>
+                  <th>CASH OUT</th>
+                  <th>NET CASH FLOW</th>
+                  <th>REALIZED GAINS</th>
+                  <th>REALIZED LOSSES</th>
+                  <th>NET REALIZED P&L</th>
+                </tr>
+              </thead>
+              <tbody id="daily-rows"></tbody>
+            </table>
+          </div>
+        </section>
+        <footer>
+          Built for a clearer view of your trades.<span
+            >chai. <span class="footer-dot">●</span> Your personal options
+            journal</span
+          >
+        </footer>
+      </main>
+    </div>
+    <dialog id="trade-dialog">
+      <form id="trade-form">
+        <div class="modal-heading">
+          <div>
+            <div class="eyebrow">GROW YOUR JOURNAL</div>
+            <h2>Log a trade</h2>
+          </div>
+          <button type="button" class="icon-button dismiss" aria-label="Close">
+            ×
+          </button>
+        </div>
+        <p class="modal-description">
+          Record your opening premium. You can close the position later.
+        </p>
+        <div class="form-grid">
+          <label
+            >Symbol<input
+              name="symbol"
+              required
+              maxlength="12"
+              placeholder="e.g. AAPL" /></label
+          ><label
+            >Strategy<select name="strategy">
+              <option value="sell_put">Sell put</option>
+              <option value="sell_call">Sell call</option>
+              <option value="buy_put">Buy put</option>
+            </select></label
+          ><label>Trade date<input name="date" type="date" required /></label
+          ><label
+            >Expiration date<input name="expiry" type="date" required /></label
+          ><label
+            >Strike price ($)<input
+              name="strike"
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              placeholder="150.00" /></label
+          ><label
+            >Contracts<input
+              name="quantity"
+              type="number"
+              min="1"
+              max="100000"
+              step="1"
+              value="1"
+              required /></label
+          ><label
+            >Premium per share ($)<input
+              name="premium"
+              type="number"
+              min="0"
+              step="0.0001"
+              required
+              placeholder="2.50" /></label
+          ><label
+            >Total opening fees ($)<input
+              name="fees"
+              type="number"
+              min="0"
+              step="0.01"
+              value="0"
+              required /></label
+          ><label
+            >Contract multiplier<input
+              name="multiplier"
+              type="number"
+              min="1"
+              max="100000"
+              step="1"
+              value="100"
+              required /></label
+          ><label
+            >Notes (optional)<input
+              name="notes"
+              maxlength="500"
+              placeholder="Your trading thesis…"
+          /></label>
+        </div>
+        <div class="form-preview" id="open-preview">
+          Enter a premium to see your opening cash flow.
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="button secondary dismiss">Cancel</button
+          ><button class="button primary">Save trade</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="close-dialog">
+      <form id="close-form">
+        <div class="modal-heading">
+          <div>
+            <div class="eyebrow">COMPLETE THE PICTURE</div>
+            <h2 id="close-title">Close position</h2>
+          </div>
+          <button type="button" class="icon-button dismiss" aria-label="Close">
+            ×
+          </button>
+        </div>
+        <p class="modal-description" id="close-description"></p>
+        <div class="form-grid">
+          <label>Close date<input name="date" type="date" required /></label
+          ><label id="closing-label"
+            >Closing premium per share ($)<input
+              name="premium"
+              type="number"
+              min="0"
+              step="0.0001"
+              required /></label
+          ><label
+            >Total closing fees ($)<input
+              name="fees"
+              type="number"
+              min="0"
+              step="0.01"
+              value="0"
+              required
+          /></label>
+        </div>
+        <div class="form-preview" id="close-preview"></div>
+        <p class="hint">
+          Closes all contracts. For expiration without value, enter 0.
+          Assignment and stock transactions are not tracked.
+        </p>
+        <div class="modal-actions">
+          <button type="button" class="button secondary dismiss">Cancel</button
+          ><button class="button primary">Close position</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="detail-dialog"><div id="detail-content"></div></dialog>
+    <dialog id="password-dialog">
+      <form id="password-form">
+        <div class="modal-heading"><h2>Set your password</h2></div>
+        <p class="modal-description" id="password-description">
+          Choose a password of at least 12 characters.
+        </p>
+        <label
+          >Current password<input
+            name="current"
+            type="password"
+            required
+            autocomplete="current-password" /></label
+        ><label
+          >New password<input
+            name="password"
+            type="password"
+            minlength="12"
+            maxlength="128"
+            required
+            autocomplete="new-password" /></label
+        ><label
+          >Confirm new password<input
+            name="confirm"
+            type="password"
+            minlength="12"
+            required
+            autocomplete="new-password"
+        /></label>
+        <p class="form-error" id="password-error" role="alert"></p>
+        <div class="modal-actions">
+          <button type="button" class="button secondary" id="password-cancel">
+            Cancel</button
+          ><button class="button primary">Update password</button>
+        </div>
+      </form>
+    </dialog>
+    <div class="toast" id="toast" role="status"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
