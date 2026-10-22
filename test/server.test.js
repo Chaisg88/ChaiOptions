@@ -74,7 +74,24 @@ test("authentication, forced password change, trade persistence, validation and 
     await start();
     const home = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(home.status, 200);
-    assert.match(await home.text(), /Options journal/);
+    const html = await home.text();
+    assert.match(html, /Options journal/);
+    assert.equal(home.headers.get("cache-control"), "no-store");
+    const stylesheet = html.match(/href="(\/style\.css\?v=[a-f0-9]+)"/)[1];
+    const asset = await fetch(`http://127.0.0.1:${port}${stylesheet}`);
+    assert.equal(asset.status, 200);
+    assert.match(asset.headers.get("cache-control"), /immutable/);
+    const unchanged = await fetch(`http://127.0.0.1:${port}${stylesheet}`, {
+      headers: { "If-None-Match": asset.headers.get("etag") },
+    });
+    assert.equal(unchanged.status, 304);
+    assert.equal((await unchanged.text()).length, 0);
+    const scriptPath = html.match(/src="(\/app\.js\?v=[a-f0-9]+)"/)[1];
+    const script = await fetch(`http://127.0.0.1:${port}${scriptPath}`);
+    assert.match(await script.text(), /finance\.js\?v=[a-f0-9]+/);
+    const privateResult = await fetch(`http://127.0.0.1:${port}/api/me`);
+    assert.equal(privateResult.status, 401);
+    assert.equal(privateResult.headers.get("cache-control"), "no-store");
     for (const file of ["app.js", "finance.js", "style.css", "login"])
       assert.equal(
         (await fetch(`http://127.0.0.1:${port}/${file}`)).status,

@@ -62,3 +62,7 @@ One codebase can host separate Chai and JeanOptions services. Each service must 
 This provides separation between app accounts, not privacy from the hosting/database administrator. Anyone controlling Render or Neon can still access the underlying records or reset accounts. Full independence requires Jean-controlled hosting and database accounts. There is no shared admin dashboard in the app.
 
 The deployment helper accepts `--service-name jean-options --app-name JeanOptions --db-schema jean_options` and can copy the existing database connection directly between Render services using `--copy-database-from-service <id>`. Connection values are never printed or written to source. Store each app's generated credentials in a different private directory outside the checkout.
+
+## Loading speed
+
+Render's free web service may sleep when idle. Opening it afterward can take tens of seconds while it wakes; browser caching cannot remove that server startup delay. Once awake, normal requests are much faster. Public CSS, scripts and the icon use versioned URLs and long-lived browser caching, with ETag revalidation for unversioned requests. Deployment changes update the asset version automatically. HTML, account responses and trade records remain `no-store`. No background traffic is scheduled to keep the free service awake.

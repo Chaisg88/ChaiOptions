@@ -29,11 +29,25 @@ if (
   !/^[a-z0-9-]{1,40}$/.test(appSlug)
 )
   throw new Error("Invalid app branding configuration");
+const assetNames = [
+  "app.js",
+  "finance.js",
+  "login.js",
+  "style.css",
+  "favicon.svg",
+];
+const assetHash = createHash("sha256")
+  .update(appName)
+  .update(process.env.RENDER_GIT_COMMIT || "");
+for (const name of assetNames)
+  assetHash.update(await readFile(path.join(root, name)));
+const assetVersion = assetHash.digest("hex").slice(0, 16);
 const templates = {
   APP_NAME: appName,
   APP_WORDMARK: wordmark,
   APP_INITIAL: wordmark[0],
   APP_SLUG: appSlug,
+  ASSET_VERSION: assetVersion,
 };
 if (process.env.REQUIRE_DATABASE === "true" && !process.env.DATABASE_URL)
   throw new Error(
@@ -294,9 +308,33 @@ const server = http
           data = data
             .toString()
             .replace(
-              /\{\{(APP_NAME|APP_WORDMARK|APP_INITIAL|APP_SLUG)\}\}/g,
+              /\{\{(APP_NAME|APP_WORDMARK|APP_INITIAL|APP_SLUG|ASSET_VERSION)\}\}/g,
               (_, key) => templates[key],
             );
+        if (pathname === "/app.js")
+          data = data
+            .toString()
+            .replace('"./finance.js"', `"./finance.js?v=${assetVersion}"`);
+        if (assetNames.includes(path.basename(file))) {
+          const etag =
+            '"' + createHash("sha256").update(data).digest("hex") + '"';
+          res.setHeader("ETag", etag);
+          res.setHeader(
+            "Cache-Control",
+            url.searchParams.get("v") === assetVersion
+              ? "public, max-age=31536000, immutable"
+              : "public, max-age=0, must-revalidate",
+          );
+          if (
+            req.headers["if-none-match"]
+              ?.split(",")
+              .some((value) => value.trim() === etag)
+          ) {
+            res.writeHead(304);
+            res.end();
+            return;
+          }
+        }
         res.writeHead(200, {
           "Content-Type":
             (types[path.extname(file)] || "application/octet-stream") +

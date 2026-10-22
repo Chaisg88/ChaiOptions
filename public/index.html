@@ -3,9 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link
+      rel="icon"
+      href="/favicon.svg?v={{ASSET_VERSION}}"
+      type="image/svg+xml"
+    />
     <title>{{APP_NAME}} — Options journal</title>
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/style.css?v={{ASSET_VERSION}}" />
   </head>
   <body data-app-name="{{APP_NAME}}" data-app-slug="{{APP_SLUG}}">
     <aside class="sidebar">
@@ -409,6 +413,6 @@
       </form>
     </dialog>
     <div class="toast" id="toast" role="status"></div>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v={{ASSET_VERSION}}"></script>
   </body>
 </html>
