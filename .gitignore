@@ -8,3 +8,6 @@ credentials.local.md
 
 __pycache__/
 *.pyc
+
+dist/
+.vercel/

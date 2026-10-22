@@ -1,12 +1,17 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-export async function openStorage({ databaseUrl, dataDir, schema = "public" }) {
+export async function openStorage({
+  databaseUrl,
+  dataDir,
+  schema = "public",
+  poolSize = 5,
+}) {
   if (!/^[a-z_][a-z0-9_]{0,62}$/.test(schema))
     throw new Error("Invalid database schema name");
   const qualify = (text) =>
     text.replace(
-      /\b(FROM|JOIN|INTO|UPDATE|REFERENCES|TABLE IF NOT EXISTS)\s+(users|sessions|trades)\b/gi,
+      /\b(FROM|JOIN|INTO|UPDATE|REFERENCES|TABLE IF NOT EXISTS)\s+(users|sessions|trades|login_attempts)\b/gi,
       (_, operation, table) =>
         `${operation} "${schema}".${table.toLowerCase()}`,
     );
@@ -21,7 +26,9 @@ export async function openStorage({ databaseUrl, dataDir, schema = "public" }) {
     const { default: pg } = await import("pg");
     pool = new pg.Pool({
       connectionString: databaseUrl,
-      max: 5,
+      max: poolSize,
+      idleTimeoutMillis: 10000,
+      allowExitOnIdle: true,
       connectionTimeoutMillis: 15000,
     });
     pool.on("error", () =>
@@ -37,7 +44,8 @@ export async function openStorage({ databaseUrl, dataDir, schema = "public" }) {
       id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
       must_change INTEGER NOT NULL DEFAULT 1, revision INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), expires BIGINT NOT NULL);
-      CREATE TABLE IF NOT EXISTS trades (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), data TEXT NOT NULL);`,
+      CREATE TABLE IF NOT EXISTS trades (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS login_attempts (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires BIGINT NOT NULL);`,
     );
   } else {
     const { DatabaseSync } = await import("node:sqlite");
@@ -51,7 +59,8 @@ export async function openStorage({ databaseUrl, dataDir, schema = "public" }) {
     sqlite.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,must_change INTEGER NOT NULL DEFAULT 1,revision INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),expires INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS trades(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),data TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS trades(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS login_attempts(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires INTEGER NOT NULL);`);
     if (
       !sqlite
         .prepare("PRAGMA table_info(users)")

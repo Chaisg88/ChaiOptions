@@ -10,19 +10,23 @@ const dir = await mkdtemp("/tmp/chai-browser-");
 const password = randomBytes(20).toString("hex");
 const nextPassword = randomBytes(20).toString("hex");
 const port = 3200;
-const server = spawn(process.execPath, ["server.js"], {
-  env: {
-    ...process.env,
-    PORT: String(port),
-    DATA_DIR: dir,
-    DATABASE_URL: process.env.TEST_DATABASE_URL || "",
-    REQUIRE_DATABASE: "false",
-    ROOT_EMAIL: "test@example.com",
-    ROOT_PASSWORD: password,
-    NODE_ENV: "test",
+const server = spawn(
+  process.execPath,
+  [process.env.SMOKE_SERVER || "server.js"],
+  {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DATA_DIR: dir,
+      DATABASE_URL: process.env.TEST_DATABASE_URL || "",
+      REQUIRE_DATABASE: "false",
+      ROOT_EMAIL: "test@example.com",
+      ROOT_PASSWORD: password,
+      NODE_ENV: "test",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
   },
-  stdio: ["ignore", "pipe", "pipe"],
-});
+);
 let browser;
 try {
   await new Promise((resolve, reject) => {

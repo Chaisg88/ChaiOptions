@@ -13,7 +13,31 @@ Requires Node.js 24 (uses built-in SQLite). Run `npm ci` to install the locked d
 
 Default port: 3000. `PORT` overrides it. `DATA_DIR` defaults to `./data`. The local SQLite database contains hashed passwords, session hashes, and trade records. Keep this directory persistent and private. Hosted PostgreSQL stores the same records remotely. Initial root variables create the first user only; changing the variables later does not reset an existing user's password. There is no public registration or email password reset service.
 
-## Publish for free with Render + Neon
+## Migrate to Vercel Hobby + the existing Neon database
+
+The Vercel configuration separates static pages from the database API. `npm run build:vercel` generates the login and dashboard pages and fingerprinted public assets in `dist/` without connecting to Neon or embedding secrets. Vercel serves these from its CDN. `api/index.js` starts the shared application only when an API request arrives, removing the need to wake a Render container before displaying the login page. Small serverless/database startup delays can still occur.
+
+Use the free Hobby plan for personal, non-commercial journals. Do not create a paid plan or paid add-on. In the Vercel project, select this GitHub repository and use the committed `vercel.json`: Other framework, Node 24, `npm ci`, build `npm run build:vercel`, output `dist`, and the bundled API function. Existing cookies are tied to the old domain, so users sign in again on the new domain; their stored password hashes and trade records stay in Neon.
+
+For ChaiOptions, configure these values in Vercel's secure environment settings:
+
+| Variable           | Setting                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`     | Copy the existing Neon connection securely; never put it in Git or chat.                                           |
+| `ROOT_EMAIL`       | `huatchaisg@gmail.com`                                                                                             |
+| `ROOT_PASSWORD`    | Existing bootstrap secret, or a generated strong secret for a new database only. Existing passwords are preserved. |
+| `DB_SCHEMA`        | `public`                                                                                                           |
+| `APP_NAME`         | `Chai`                                                                                                             |
+| `APP_SLUG`         | `chai-options`                                                                                                     |
+| `REQUIRE_DATABASE` | `true`                                                                                                             |
+
+Vercel supplies `VERCEL` and the production Node environment. Production startup requires PostgreSQL. The API uses secure cookies, the same sessions and trade schema, and database-backed login limits that survive function restarts. SQL schema initialization and bootstrap insertion are idempotent; no migration resets a user's password or replaces trading records. Use the existing `jean_options` schema and Jean's own branding and root email for any separate JeanOptions project.
+
+`npm run dev:vercel` runs a local static/CDN and parsed-body API routing harness. Automated integration tests cover both the conventional server and this serverless adapter, including login limits surviving a restart. `SMOKE_SERVER=scripts/serve-vercel-local.mjs` runs the browser workflow through the new path.
+
+Deploy and verify the static login page, `/health`, sign-in, trade persistence and logout on Vercel before retiring the old site. Vercel deployment access must be available in the current chat or official CLI; an account connection elsewhere does not expose deployment tools automatically. No Vercel deployment has been published by this migration preparation alone.
+
+## Legacy Render deployment
 
 `render.yaml` uses Render's free Node web service and a separate Neon free PostgreSQL database. There is no Render persistent disk or paid database in this configuration. Free-tier quotas and terms apply; Render may sleep when idle, so the first request can take time. Never enable paid upgrades without reviewing their price.
 

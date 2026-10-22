@@ -6,214 +6,264 @@ import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 
-test("authentication, forced password change, trade persistence, validation and logout", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "chai-test-")),
-    port = 35000 + Math.floor(Math.random() * 20000),
-    password = randomBytes(20).toString("hex"),
-    nextPassword = randomBytes(20).toString("hex");
-  let server;
-  function start() {
-    server = spawn(process.execPath, ["server.js"], {
-      env: {
-        ...process.env,
-        PORT: String(port),
-        DATA_DIR: dir,
-        DATABASE_URL: process.env.TEST_DATABASE_URL || "",
-        REQUIRE_DATABASE: "false",
-        ROOT_EMAIL: "test@example.com",
-        APP_NAME: process.env.TEST_APP_NAME || "Chai",
-        APP_SLUG: process.env.TEST_APP_SLUG || "chai-options",
-        DB_SCHEMA: process.env.TEST_DB_SCHEMA || "public",
-        ROOT_PASSWORD: password,
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error("Startup timeout")),
-        10000,
-      );
-      server.once("error", reject);
-      server.stdout.on("data", (d) => {
-        if (d.toString().includes("running")) {
-          clearTimeout(timer);
-          resolve();
-        }
+for (const target of ["server.js", "scripts/serve-vercel-local.mjs"])
+  test(`authentication, persistence and trading workflow: ${target}`, async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "chai-test-")),
+      port = 35000 + Math.floor(Math.random() * 20000),
+      password = randomBytes(20).toString("hex"),
+      nextPassword = randomBytes(20).toString("hex");
+    const schema = process.env.TEST_DATABASE_URL
+      ? `flow_${randomBytes(6).toString("hex")}`
+      : process.env.TEST_DB_SCHEMA || "public";
+    let server;
+    function start() {
+      server = spawn(process.execPath, [target], {
+        env: {
+          ...process.env,
+          PORT: String(port),
+          DATA_DIR: dir,
+          DATABASE_URL: process.env.TEST_DATABASE_URL || "",
+          REQUIRE_DATABASE: "false",
+          ROOT_EMAIL: "test@example.com",
+          APP_NAME: process.env.TEST_APP_NAME || "Chai",
+          APP_SLUG: process.env.TEST_APP_SLUG || "chai-options",
+          DB_SCHEMA: schema,
+          ROOT_PASSWORD: password,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
       });
-      server.once("exit", (code) => {
-        if (code) reject(new Error("Server exited " + code));
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error("Startup timeout")),
+          10000,
+        );
+        server.once("error", reject);
+        server.stdout.on("data", (d) => {
+          if (d.toString().includes("running")) {
+            clearTimeout(timer);
+            resolve();
+          }
+        });
+        server.once("exit", (code) => {
+          if (code) reject(new Error("Server exited " + code));
+        });
       });
-    });
-  }
-  async function stop() {
-    if (!server || server.exitCode !== null) return;
-    await new Promise((resolve) => {
-      server.once("exit", resolve);
-      server.kill();
-    });
-  }
-  let cookie = "";
-  const call = async (endpoint, body, extra = {}) => {
-    const r = await fetch(`http://127.0.0.1:${port}/api/${endpoint}`, {
-      method: body === undefined ? "GET" : "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Chai-Request": "1",
-        Cookie: cookie,
-        ...extra,
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    return {
-      status: r.status,
-      data: await r.json(),
-      cookie: r.headers.get("set-cookie"),
+    }
+    async function stop() {
+      if (!server || server.exitCode !== null) return;
+      await new Promise((resolve) => {
+        server.once("exit", resolve);
+        server.kill();
+      });
+    }
+    let cookie = "";
+    const call = async (endpoint, body, extra = {}) => {
+      const r = await fetch(`http://127.0.0.1:${port}/api/${endpoint}`, {
+        method: body === undefined ? "GET" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Chai-Request": "1",
+          Cookie: cookie,
+          ...extra,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      return {
+        status: r.status,
+        data: await r.json(),
+        cookie: r.headers.get("set-cookie"),
+      };
     };
-  };
-  try {
-    await start();
-    const home = await fetch(`http://127.0.0.1:${port}/`);
-    assert.equal(home.status, 200);
-    const html = await home.text();
-    assert.match(html, /Options journal/);
-    assert.equal(home.headers.get("cache-control"), "no-store");
-    const stylesheet = html.match(/href="(\/style\.css\?v=[a-f0-9]+)"/)[1];
-    const asset = await fetch(`http://127.0.0.1:${port}${stylesheet}`);
-    assert.equal(asset.status, 200);
-    assert.match(asset.headers.get("cache-control"), /immutable/);
-    const unchanged = await fetch(`http://127.0.0.1:${port}${stylesheet}`, {
-      headers: { "If-None-Match": asset.headers.get("etag") },
-    });
-    assert.equal(unchanged.status, 304);
-    assert.equal((await unchanged.text()).length, 0);
-    const proxyValidator = await fetch(
-      `http://127.0.0.1:${port}${stylesheet}`,
-      {
-        headers: { "If-None-Match": "W/" + asset.headers.get("etag") },
-      },
-    );
-    assert.equal(proxyValidator.status, 304);
-    const scriptPath = html.match(/src="(\/app\.js\?v=[a-f0-9]+)"/)[1];
-    const script = await fetch(`http://127.0.0.1:${port}${scriptPath}`);
-    assert.match(await script.text(), /finance\.js\?v=[a-f0-9]+/);
-    const privateResult = await fetch(`http://127.0.0.1:${port}/api/me`);
-    assert.equal(privateResult.status, 401);
-    assert.equal(privateResult.headers.get("cache-control"), "no-store");
-    for (const file of ["app.js", "finance.js", "style.css", "login"])
+    try {
+      await start();
+      const home = await fetch(`http://127.0.0.1:${port}/`);
+      assert.equal(home.status, 200);
+      const html = await home.text();
+      assert.match(html, /Options journal/);
+      if (target === "server.js")
+        assert.equal(home.headers.get("cache-control"), "no-store");
+      const stylesheet = html.match(/href="([^"]*style\.css[^"]*)"/)[1];
+      const asset = await fetch(`http://127.0.0.1:${port}${stylesheet}`);
+      assert.equal(asset.status, 200);
+      assert.match(asset.headers.get("cache-control"), /immutable/);
+      if (target === "server.js") {
+        const unchanged = await fetch(`http://127.0.0.1:${port}${stylesheet}`, {
+          headers: { "If-None-Match": asset.headers.get("etag") },
+        });
+        assert.equal(unchanged.status, 304);
+        assert.equal((await unchanged.text()).length, 0);
+        const proxyValidator = await fetch(
+          `http://127.0.0.1:${port}${stylesheet}`,
+          {
+            headers: { "If-None-Match": "W/" + asset.headers.get("etag") },
+          },
+        );
+        assert.equal(proxyValidator.status, 304);
+      }
+      const scriptPath = html.match(/src="([^"]*app\.js[^"]*)"/)[1];
+      const script = await fetch(`http://127.0.0.1:${port}${scriptPath}`);
+      assert.match(await script.text(), /finance\.js/);
+      const privateResult = await fetch(`http://127.0.0.1:${port}/api/me`);
+      assert.equal(privateResult.status, 401);
+      assert.equal(privateResult.headers.get("cache-control"), "no-store");
+      if (target === "server.js")
+        for (const file of ["app.js", "finance.js", "style.css", "login"])
+          assert.equal(
+            (await fetch(`http://127.0.0.1:${port}/${file}`)).status,
+            200,
+          );
       assert.equal(
-        (await fetch(`http://127.0.0.1:${port}/${file}`)).status,
+        (await fetch(`http://127.0.0.1:${port}/health`)).status,
         200,
       );
-    assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status, 200);
-    assert.equal((await fetch(`http://127.0.0.1:${port}/.env`)).status, 404);
-    assert.equal((await call("trades")).status, 401);
-    assert.equal(
-      (await call("login", { email: "test@example.com", password: "wrong" }))
-        .status,
-      401,
-    );
-    const login = await call("login", { email: "test@example.com", password });
-    assert.equal(login.status, 200);
-    assert.equal(login.data.mustChange, true);
-    assert.match(login.cookie, /HttpOnly/);
-    assert.match(login.cookie, /SameSite=Strict/);
-    cookie = login.cookie.split(";")[0];
-    assert.equal((await call("trades")).status, 403);
-    assert.equal(
-      (
-        await call(
-          "password",
-          { current: password, password: nextPassword },
-          { "Sec-Fetch-Site": "cross-site" },
-        )
-      ).status,
-      403,
-    );
-    assert.equal(
-      (await call("password", { current: "wrong", password: nextPassword }))
-        .status,
-      400,
-    );
-    assert.equal(
-      (await call("password", { current: password, password: nextPassword }))
-        .status,
-      200,
-    );
-    assert.deepEqual((await call("trades")).data, { trades: [], revision: 0 });
-    const trade = {
-      id: "test-1",
-      symbol: "AAPL",
-      strategy: "sell_put",
-      date: "2026-10-20",
-      expiry: "2026-10-30",
-      strike: 150,
-      premium: 2.5,
-      fees: 1,
-      quantity: 1,
-      multiplier: 100,
-      notes: "test",
-    };
-    assert.equal(
-      (await call("trades", { trades: [trade], revision: 0 })).status,
-      200,
-    );
-    assert.equal(
-      (await call("trades", { trades: [], revision: 0 })).status,
-      409,
-    );
-    assert.equal(
-      (
-        await call("trades", {
-          trades: [{ ...trade, quantity: -1 }],
-          revision: 1,
-        })
-      ).status,
-      400,
-    );
-    assert.equal(
-      (
-        await call("trades", {
-          trades: [
-            { ...trade, close: { date: "2026-10-19", premium: 1, fees: 0 } },
-          ],
-          revision: 1,
-        })
-      ).status,
-      400,
-    );
-    trade.close = { date: "2026-10-21", premium: 0.5, fees: 1 };
-    assert.equal(
-      (await call("trades", { trades: [trade], revision: 1 })).status,
-      200,
-    );
-    const competing = await Promise.all([
-      call("trades", { trades: [trade], revision: 2 }),
-      call("trades", { trades: [trade], revision: 2 }),
-    ]);
-    assert.deepEqual(competing.map((r) => r.status).sort(), [200, 409]);
-    await stop();
-    await start();
-    assert.deepEqual((await call("trades")).data, {
-      trades: [trade],
-      revision: 3,
-    });
-    assert.equal((await call("logout", {})).status, 200);
-    assert.equal((await call("trades")).status, 401);
-    assert.equal(
-      (await call("login", { email: "test@example.com", password })).status,
-      401,
-    );
-    assert.equal(
-      (
-        await call("login", {
-          email: "test@example.com",
-          password: nextPassword,
-        })
-      ).status,
-      200,
-    );
-  } finally {
-    await stop();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+      assert.equal((await fetch(`http://127.0.0.1:${port}/.env`)).status, 404);
+      assert.equal((await call("trades")).status, 401);
+      assert.equal(
+        (await call("login", { email: "test@example.com", password: "wrong" }))
+          .status,
+        401,
+      );
+      const login = await call("login", {
+        email: "test@example.com",
+        password,
+      });
+      assert.equal(login.status, 200);
+      assert.equal(login.data.mustChange, true);
+      assert.match(login.cookie, /HttpOnly/);
+      assert.match(login.cookie, /SameSite=Strict/);
+      cookie = login.cookie.split(";")[0];
+      assert.equal((await call("trades")).status, 403);
+      assert.equal(
+        (
+          await call(
+            "password",
+            { current: password, password: nextPassword },
+            { "Sec-Fetch-Site": "cross-site" },
+          )
+        ).status,
+        403,
+      );
+      assert.equal(
+        (await call("password", { current: "wrong", password: nextPassword }))
+          .status,
+        400,
+      );
+      assert.equal(
+        (await call("password", { current: password, password: nextPassword }))
+          .status,
+        200,
+      );
+      assert.deepEqual((await call("trades")).data, {
+        trades: [],
+        revision: 0,
+      });
+      const trade = {
+        id: "test-1",
+        symbol: "AAPL",
+        strategy: "sell_put",
+        date: "2026-10-20",
+        expiry: "2026-10-30",
+        strike: 150,
+        premium: 2.5,
+        fees: 1,
+        quantity: 1,
+        multiplier: 100,
+        notes: "test",
+      };
+      assert.equal(
+        (await call("trades", { trades: [trade], revision: 0 })).status,
+        200,
+      );
+      assert.equal(
+        (await call("trades", { trades: [], revision: 0 })).status,
+        409,
+      );
+      assert.equal(
+        (
+          await call("trades", {
+            trades: [{ ...trade, quantity: -1 }],
+            revision: 1,
+          })
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await call("trades", {
+            trades: [
+              { ...trade, close: { date: "2026-10-19", premium: 1, fees: 0 } },
+            ],
+            revision: 1,
+          })
+        ).status,
+        400,
+      );
+      trade.close = { date: "2026-10-21", premium: 0.5, fees: 1 };
+      assert.equal(
+        (await call("trades", { trades: [trade], revision: 1 })).status,
+        200,
+      );
+      const competing = await Promise.all([
+        call("trades", { trades: [trade], revision: 2 }),
+        call("trades", { trades: [trade], revision: 2 }),
+      ]);
+      assert.deepEqual(competing.map((r) => r.status).sort(), [200, 409]);
+      await stop();
+      await start();
+      assert.deepEqual((await call("trades")).data, {
+        trades: [trade],
+        revision: 3,
+      });
+      assert.equal((await call("logout", {})).status, 200);
+      assert.equal((await call("trades")).status, 401);
+      assert.equal(
+        (await call("login", { email: "test@example.com", password })).status,
+        401,
+      );
+      assert.equal(
+        (
+          await call("login", {
+            email: "test@example.com",
+            password: nextPassword,
+          })
+        ).status,
+        200,
+      );
+      for (let i = 0; i < 10; i++)
+        assert.equal(
+          (
+            await call("login", {
+              email: "test@example.com",
+              password: "wrong",
+            })
+          ).status,
+          401,
+        );
+      assert.equal(
+        (await call("login", { email: "test@example.com", password: "wrong" }))
+          .status,
+        429,
+      );
+      await stop();
+      await start();
+      assert.equal(
+        (await call("login", { email: "test@example.com", password: "wrong" }))
+          .status,
+        429,
+      );
+    } finally {
+      await stop();
+      if (process.env.TEST_DATABASE_URL) {
+        const { default: pg } = await import("pg");
+        const pool = new pg.Pool({
+          connectionString: process.env.TEST_DATABASE_URL,
+        });
+        try {
+          await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+        } finally {
+          await pool.end();
+        }
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
