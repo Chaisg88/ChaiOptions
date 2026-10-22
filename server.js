@@ -328,7 +328,11 @@ const server = http
           if (
             req.headers["if-none-match"]
               ?.split(",")
-              .some((value) => value.trim() === etag)
+              .some(
+                (value) =>
+                  value.trim() === "*" ||
+                  value.trim().replace(/^W\//, "") === etag,
+              )
           ) {
             res.writeHead(304);
             res.end();

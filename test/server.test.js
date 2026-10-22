@@ -86,6 +86,13 @@ test("authentication, forced password change, trade persistence, validation and 
     });
     assert.equal(unchanged.status, 304);
     assert.equal((await unchanged.text()).length, 0);
+    const proxyValidator = await fetch(
+      `http://127.0.0.1:${port}${stylesheet}`,
+      {
+        headers: { "If-None-Match": "W/" + asset.headers.get("etag") },
+      },
+    );
+    assert.equal(proxyValidator.status, 304);
     const scriptPath = html.match(/src="(\/app\.js\?v=[a-f0-9]+)"/)[1];
     const script = await fetch(`http://127.0.0.1:${port}${scriptPath}`);
     assert.match(await script.text(), /finance\.js\?v=[a-f0-9]+/);
