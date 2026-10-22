@@ -8,15 +8,26 @@ import {
 } from "node:crypto";
 import { openStorage } from "./storage.js";
 import { loadBranding } from "./branding.js";
+import { startupError } from "./startup-errors.js";
 
 export async function createApplication(env = process.env) {
+  if (env.REQUIRE_DATABASE === "true" && !env.DATABASE_URL?.trim())
+    throw startupError("DATABASE_NOT_CONFIGURED");
+  if (env.DATABASE_URL) {
+    try {
+      const database = new URL(env.DATABASE_URL);
+      if (
+        !["postgres:", "postgresql:"].includes(database.protocol) ||
+        !database.hostname
+      )
+        throw new Error("Invalid database URL");
+    } catch {
+      throw startupError("DATABASE_URL_INVALID");
+    }
+  }
   const { root, appName, assetNames, assetVersion, templates } =
     await loadBranding(env);
   const dataDir = path.resolve(env.DATA_DIR || "./data");
-  if (env.REQUIRE_DATABASE === "true" && !env.DATABASE_URL)
-    throw new Error(
-      "Configure DATABASE_URL in the hosting environment to connect permanent storage.",
-    );
   const db = await openStorage({
     databaseUrl: env.DATABASE_URL,
     dataDir,
@@ -35,10 +46,10 @@ export async function createApplication(env = process.env) {
   if (!(await db.get("SELECT id FROM users LIMIT 1"))) {
     const email = env.ROOT_EMAIL?.trim().toLowerCase(),
       password = env.ROOT_PASSWORD;
-    if (!email || !password || password.length < 12 || password.length > 128)
-      throw new Error(
-        "First startup requires ROOT_EMAIL and ROOT_PASSWORD (at least 12 characters). Configure environment variables; do not put credentials in source.",
-      );
+    if (!email || !password || password.length < 12 || password.length > 128) {
+      await db.close();
+      throw startupError("ROOT_ACCOUNT_NOT_CONFIGURED");
+    }
     await db.run(
       "INSERT INTO users(email,password) VALUES (?,?) ON CONFLICT(email) DO NOTHING",
       email,

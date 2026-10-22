@@ -37,6 +37,8 @@ Vercel supplies `VERCEL` and the production Node environment. Production startup
 
 Deploy and verify the static login page, `/health`, sign-in, trade persistence and logout on Vercel before retiring the old site. Vercel deployment access must be available in the current chat or official CLI; an account connection elsewhere does not expose deployment tools automatically. No Vercel deployment has been published by this migration preparation alone.
 
+If the login page loads but sign-in and `/health` return HTTP 503, the API failed to initialize; this is not a rejected app password. `/health` reports a safe startup code without revealing connection strings. `DATABASE_NOT_CONFIGURED` means `DATABASE_URL` is missing from that deployment; `DATABASE_URL_INVALID` means it is malformed; `DATABASE_AUTH_FAILED` means Neon rejected the database credentials. Set or correct the variable in the project's **Production** environment, then redeploy. Editing environment settings does not update an existing deployment. Use the latest production deployment's Visit link; an older deployment URL continues using its original code and settings. Unknown failures return `STARTUP_FAILED`; inspect Vercel runtime logs for the remaining cause. Never paste database values or app passwords into chat, Git, or build logs, and never reset an account to diagnose a connection failure.
+
 ## Legacy Render deployment
 
 `render.yaml` uses Render's free Node web service and a separate Neon free PostgreSQL database. There is no Render persistent disk or paid database in this configuration. Free-tier quotas and terms apply; Render may sleep when idle, so the first request can take time. Never enable paid upgrades without reviewing their price.

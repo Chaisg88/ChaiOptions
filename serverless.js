@@ -1,4 +1,5 @@
 import { createApplication } from "./application.js";
+import { publicStartupError } from "./startup-errors.js";
 export function createServerlessHandler(env = process.env) {
   let ready;
   return {
@@ -33,17 +34,14 @@ export function createServerlessHandler(env = process.env) {
         await app.handle(req, res);
       } catch (error) {
         ready = undefined;
-        console.error("API initialization failed:", error.code || error.name);
+        const failure = publicStartupError(error);
+        console.error("API initialization failed:", failure.code);
         if (!res.headersSent)
           res.writeHead(503, {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
           });
-        res.end(
-          JSON.stringify({
-            error: "The service could not connect. Please try again shortly.",
-          }),
-        );
+        res.end(JSON.stringify(failure));
       }
     },
     async close() {
